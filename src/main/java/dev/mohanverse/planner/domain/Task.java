@@ -7,6 +7,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,11 +21,46 @@ public class Task {
 
     private int durationInGrains;
 
+    private Integer preferredStartHour;
+
+    private LocalDate forDate;
+
     @PlanningVariable
     private TimeGrain startingTimeGrain;
+
+    private static List<TimeGrain> allGrainsRef; // set once in Main before solving
+
 
     public Task(String name, int durationInGrains) {
         this.name = name;
         this.durationInGrains = durationInGrains;
+    }
+
+    public Task(String name, int durationInGrains, int preferredStartHour) {
+        this.name = name;
+        this.durationInGrains = durationInGrains;
+        this.preferredStartHour = preferredStartHour;
+    }
+
+    public Task(String name, int durationInGrains, int preferredStartHour, LocalDate forDate) {
+        this.name = name;
+        this.durationInGrains = durationInGrains;
+        this.preferredStartHour = preferredStartHour;
+        this.forDate = forDate;
+    }
+
+
+    public static void setAllGrains(List<TimeGrain> grains) {
+        allGrainsRef = grains;
+    }
+
+    public int getSpilloverCount() {
+        if (startingTimeGrain == null) return 0;
+        int start = startingTimeGrain.getIndex();
+        int count = 0;
+        for (int i = start; i < start + durationInGrains; i++) {
+            if (i >= allGrainsRef.size() || allGrainsRef.get(i).isBlocked()) count++;
+        }
+        return count;
     }
 }

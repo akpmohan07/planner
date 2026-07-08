@@ -8,11 +8,16 @@ import dev.mohanverse.planner.domain.Task;
 import dev.mohanverse.planner.domain.TimeGrain;
 import dev.mohanverse.planner.domain.WeekSchedule;
 import dev.mohanverse.planner.event.Shift;
+import dev.mohanverse.planner.event.Sleep;
 import dev.mohanverse.planner.solver.PlannerConstraintProvider;
+import dev.mohanverse.planner.util.CalendarPrinter;
 import dev.mohanverse.planner.util.TimeGrainGenerator;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.WeekFields;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
@@ -33,33 +38,49 @@ public class Main {
         FixedEventBlocker.block(allGrains, saturday);
         FixedEventBlocker.block(allGrains, sunday);
 
+        Sleep.blockWeek(2026, 28, allGrains);
+
+        // print
+        allGrains.stream()
+                .filter(TimeGrain::isBlocked)
+                .forEach(g -> System.out.println(g.getDate() + " " + g.getStartTime() + " is blocked by " + g.getOccupiedBy()));
 
 
+
+        CalendarPrinter.print(allGrains);
         List<TimeGrain> freeGrains = allGrains.stream()
                 .filter(g -> !g.isBlocked())
                 .toList();
+        List<Task> tasks = new ArrayList<>();
+        WeekFields weekFields = WeekFields.ISO;
+        LocalDate monday = LocalDate.of(2026, 1, 1)
+                .with(weekFields.weekOfYear(), 28)
+                .with(weekFields.dayOfWeek(), 1);
+        for (int day = 0; day < 7; day++) {
+            LocalDate date = monday.plusDays(day);
+            tasks.add(new Task("Cooking-" + day, 2, 19, date)); // 1h, prefer 7PM
+        }
 
-        List<Task> tasks = List.of(
-                new Task("Study", 4),
-                new Task("Garden", 6),
-                new Task("Workout", 2)
-        );
+        Task.setAllGrains(allGrains);
 
         SolverFactory<WeekSchedule> factory = SolverFactory.create(
                 new SolverConfig()
                         .withSolutionClass(WeekSchedule.class)
                         .withEntityClasses(Task.class)
                         .withConstraintProviderClass(PlannerConstraintProvider.class)
-                        .withTerminationSpentLimit(Duration.ofMinutes(5))
+                        .withTerminationSpentLimit(Duration.ofSeconds(10))
         );
 
         Solver<WeekSchedule> solver = factory.buildSolver();
         WeekSchedule solution = solver.solve(new WeekSchedule(freeGrains, tasks));
 
+        System.out.println();
+        System.out.println("=== Solved Tasks ===");
         solution.getTasks().forEach(t -> {
             var grain = t.getStartingTimeGrain();
             System.out.println(t.getName() + " (" + t.getDurationInGrains() + " grains) -> "
                     + grain.getDate() + " " + grain.getStartTime());
         });
+        System.out.println("Score: " + solution.getScore());
     }
 }

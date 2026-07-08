@@ -16,7 +16,7 @@ public class Shift implements FixedEvent {
 
     @Override
     public List<FixedEvent> chainSubsequent() {
-        Travel travel = new Travel(end.plusHours(1), end.plusHours(9));
+        Travel travel = new Travel(end, end.plusHours(1));
         return List.of(travel);
     }
 }
