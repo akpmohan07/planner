@@ -23,6 +23,17 @@
 hs_err_pid*
 replay_pid*
 
-.gradle
-.idea
-build
+# IDE
+.idea/
+*.iml
+
+# Gradle / build output
+.gradle/
+build/
+
+# OS
+.DS_Store
+
+# Personal/interview context - not for public repo
+ProjectContext.md
+CLAUDE.md
