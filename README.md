@@ -9,7 +9,7 @@ one, and manual planning had genuinely broken down. "Everything, nothing is gett
 That's the problem that started this project. I also have an interview opportunity with Timefold,
 the company behind the open source constraint solver this planner runs on, for their Optimization
 Model Engineer role. I built this project to prepare for it: something real I could show, on their
-own solver, instead of just talking through a toy tutorial.
+own solver, instead of usual process.
 
 This isn't a scheduling app. The goal was to model my week honestly and see where real optimization
 is actually needed, versus where it's just structure nobody had written down. That question turned
@@ -54,15 +54,16 @@ dev.mohanverse.planner
 
 `FixedEvent` is a pure contract: start, end, label, `chainSubsequent()`. Originating events
 (`Shift`, `Wakeup`) own real-world context and decide what happens next. Building blocks (`Travel`,
-`Sleep`, `StudyTime`) are dumb. They don't invent their own follow-up, they just carry whatever
-they're given.
+`Sleep`, `StudyTime`). These are all deterministic events where it have one perfect solution, which I know.
+
 
 ```java
-// Wakeup.chainSubsequent(): a weekday gets Travel + StudyTime, a weekend gets just Travel
+// Wakeup.chainSubsequent(): a weekday gets Travel + StudyTime,dy
 if (isWeekday) {
     return List.of(travel, new StudyTime(travelEnd, travelEnd.plusHours(7)));
 }
-return List.of(travel);
+//  Weekend gets just Study, where I college is closed.
+return List.of(study);
 ```
 
 `FixedEventBlocker.block(grains, event)` blocks an event's own range, then recurses into
@@ -110,7 +111,7 @@ working with zero code changes, because nothing is hardcoded to specific days.
 - Generalize `Wakeup`'s Travel/StudyTime decision to react to whatever's actually blocked that day
   (e.g. a shift), instead of a fixed weekday/weekend calendar check.
 - Wire Garden and Workout into the solver alongside Cooking.
-- A priority-based "call family" slot: hard constraint for closest family, round-robin soft
+- **A priority-based "call family" slot:** hard constraint for closest family, round-robin soft
   constraint for everyone else, driven by last-contacted date. The most genuinely solver-shaped
   piece of the project, and it hasn't been started yet.
 
@@ -132,7 +133,7 @@ Java 21 · Gradle · [Timefold Solver](https://timefold.ai) 2.2.0 · Lombok · L
 I built this with Claude Code as a pair-programming partner, and I want to be upfront about how the
 work actually split.
 
-The problem framing, the deterministic-vs-solver architectural split, deciding which constraints
+Mine: The problem framing, the deterministic-vs-solver architectural split, deciding which constraints
 should be hard vs. soft, and working through the real-world constraints (Garden's actual allotment
 hours, why a Dominos shift rules out a college day, how sleep should adapt to a late shift) were
 mine. So was catching the design gaps as they came up. An early solver run, for instance, silently
