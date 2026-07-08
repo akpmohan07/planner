@@ -90,6 +90,8 @@ Constraints currently implemented in `PlannerConstraintProvider`:
 | `preferPreferredStartHour` | soft | penalizes `\|actualHour - preferredHour\|` |
 
 ### What's working end to end today
+<img width="347" height="824" alt="image" src="https://github.com/user-attachments/assets/b8805e80-6b96-4044-82d8-a5c6e80aaa81" />
+
 
 Cooking is the first task fully wired through the solver. Seven one-hour sessions, one per day,
 each hard-pinned to its calendar date and softly preferring 7pm. There's no day-of-week logic
