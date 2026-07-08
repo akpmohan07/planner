@@ -1,33 +1,30 @@
 # Personal Weekly Optimizer
 
-My week has genuinely irregular structure: part-time shifts (Dominos) to cover costs while
-finishing an MSc (Secure Software Engineering, DCU) and actively job-hunting. Shift timing changes
-weekly, sleep timing depends on the previous night's shift, and everything else — study, garden,
-workout, cooking — has to fit around that. Most calendar tools assume a fixed 9-to-5 life. Manual
-planning had broken down completely: "everything, nothing is getting planned."
+My week doesn't have a normal shape. Part-time shifts at Dominos cover costs while I finish an MSc
+in Secure Software Engineering at DCU and job-hunt on the side. Shift timing changes week to week,
+sleep depends on when the last shift ended, and everything else (study, garden, workout, cooking)
+has to fit around whatever's left. Most calendar tools assume a fixed 9-to-5 life. Mine doesn't have
+one, and manual planning had genuinely broken down. "Everything, nothing is getting planned."
 
-That problem is what led to this project. It also turned into a fitting way to prepare for a
-discovery call with Timefold, the company behind the open source constraint solver this planner is
-built on, for their Optimization Model Engineer role (connection made at a Java User Group (JUG)
-Dublin meetup). Rather than prepare by reading docs and building a toy tutorial, I built something
-real on their solver — solving my actual problem above, not a contrived one.
+That's the problem that started this project. I also have an interview opportunity with Timefold,
+the company behind the open source constraint solver this planner runs on, for their Optimization
+Model Engineer role. I built this project to prepare for it: something real I could show, on their
+own solver, instead of just talking through a toy tutorial.
 
-So this isn't "build a scheduling app." It's "model my actual week honestly, and find out where
-real optimization is needed versus where it's just undiscovered deterministic structure." That
-distinction — and how much smaller the genuine solver problem turned out to be than expected — is
-the main finding of the project, and it's what the rest of this README walks through.
+This isn't a scheduling app. The goal was to model my week honestly and see where real optimization
+is actually needed, versus where it's just structure nobody had written down. That question turned
+out to matter more than I expected, and the rest of this README is basically the answer.
 
 ## The core insight
 
-Most of a personal week is **deterministic**, not a solver problem. Given a shift schedule, sleep
-timing, travel, and study windows all follow fixed rules with no real choice involved — there's
-one correct answer, computable directly, with nothing to search over. The genuine solver problem
-turned out to be much narrower than I expected: placing a handful of flexible activities (cooking,
-garden, workout) into whatever free time is actually left once the fixed structure of the week is
-accounted for.
+Most of a personal week is deterministic, not a solver problem. Shift schedule, sleep timing,
+travel, and study windows all follow fixed rules with no real choice in them. There's one correct
+answer and it's computable directly. The genuine solver problem is much narrower than that:
+fitting a handful of flexible activities (cooking, garden, workout) into whatever free time is
+actually left once the fixed parts of the week are accounted for.
 
-This split — deterministic fixed events vs. genuine solver-worthy decisions — is the main
-architectural principle of the whole project, and it shows up directly in the package layout below.
+That split, between what's deterministic and what's actually worth solving, is the main
+architectural idea in this codebase. It shows up directly in the package layout below.
 
 ## Architecture
 
@@ -55,29 +52,29 @@ dev.mohanverse.planner
 
 ### Fixed events: a chain of responsibility
 
-`FixedEvent` is a pure contract (start, end, label, `chainSubsequent()`). **Originating events**
-(`Shift`, `Wakeup`) own real-world context and decide what follows them. **Building blocks**
-(`Travel`, `Sleep`, `StudyTime`) are dumb — they don't invent their own follow-up, they just carry
-whatever they're given.
+`FixedEvent` is a pure contract: start, end, label, `chainSubsequent()`. Originating events
+(`Shift`, `Wakeup`) own real-world context and decide what happens next. Building blocks (`Travel`,
+`Sleep`, `StudyTime`) are dumb. They don't invent their own follow-up, they just carry whatever
+they're given.
 
 ```java
-// Wakeup.chainSubsequent() — a weekday gets Travel + StudyTime, a weekend gets just Travel
+// Wakeup.chainSubsequent(): a weekday gets Travel + StudyTime, a weekend gets just Travel
 if (isWeekday) {
     return List.of(travel, new StudyTime(travelEnd, travelEnd.plusHours(7)));
 }
 return List.of(travel);
 ```
 
-`FixedEventBlocker.block(grains, event)` recursively blocks an event's own range, then recurses
-into `event.chainSubsequent()`. A three-line `Shift` object in `Main` cascades into Travel, Sleep,
-Wakeup, Travel, and StudyTime automatically — none of that chain is hand-wired in `Main` itself.
+`FixedEventBlocker.block(grains, event)` blocks an event's own range, then recurses into
+`event.chainSubsequent()`. A three-line `Shift` object in `Main` cascades into Travel, Sleep,
+Wakeup, Travel and StudyTime automatically. None of that chain is hand-wired in `Main`.
 
 ## The actual solver problem
 
-`Task` is a `@PlanningEntity` with a single `@PlanningVariable TimeGrain startingTimeGrain`. Its
-value range is the **shared list of free grains** on `WeekSchedule`, not a per-entity filtered
-range — per Timefold's own docs, restricting the value range per entity effectively creates a
-hidden hard constraint and removes the solver's freedom to escape local optima during search.
+`Task` is a `@PlanningEntity` with one `@PlanningVariable`: `TimeGrain startingTimeGrain`. Its value
+range is the shared list of free grains on `WeekSchedule`, not a range filtered per entity. Per
+Timefold's own docs, restricting the value range per entity effectively creates a hidden hard
+constraint, and it removes the solver's freedom to escape local optima during search.
 
 Constraints currently implemented in `PlannerConstraintProvider`:
 
@@ -90,10 +87,11 @@ Constraints currently implemented in `PlannerConstraintProvider`:
 
 ### What's working end to end today
 
-Cooking is the first task fully wired through the solver: seven 1-hour sessions, one per day,
-each hard-pinned to its calendar date, each softly preferring 7pm. No day-of-week logic anywhere —
-the solver just sees whatever's actually free that week and finds the closest available hour to
-19:00 for each day, sliding earlier automatically on days a shift already occupies dinner time:
+Cooking is the first task fully wired through the solver. Seven one-hour sessions, one per day,
+each hard-pinned to its calendar date and softly preferring 7pm. There's no day-of-week logic
+anywhere. The solver just looks at whatever's actually free that week and finds the closest
+available hour to 19:00 for each day, sliding earlier automatically on days a shift already occupies
+dinner time:
 
 ```
 Cooking-0 (Mon) -> 19:00   Cooking-1 (Tue) -> 19:00   Cooking-2 (Wed) -> 19:00
@@ -103,25 +101,25 @@ Score: 0hard/-3soft
 ```
 
 `0hard` means every task landed on its correct day with no overlaps or spillover. The `-3soft` is
-the true optimum for this model — there's no arrangement that gets any of the three shift-day
-cooking sessions to exactly 7pm without spilling into the shift. If the shift schedule changes next
-week, this keeps working with zero code changes, because nothing is hardcoded to specific days.
+the true optimum here. There's no arrangement that gets any of the three shift-day cooking sessions
+to exactly 7pm without spilling into the shift. If the shift schedule changes next week, this keeps
+working with zero code changes, because nothing is hardcoded to specific days.
 
 ## Roadmap
 
 - Generalize `Wakeup`'s Travel/StudyTime decision to react to whatever's actually blocked that day
   (e.g. a shift), instead of a fixed weekday/weekend calendar check.
 - Wire Garden and Workout into the solver alongside Cooking.
-- A priority-based "call family" slot — hard constraint for closest family, round-robin soft
+- A priority-based "call family" slot: hard constraint for closest family, round-robin soft
   constraint for everyone else, driven by last-contacted date. The most genuinely solver-shaped
-  piece of the whole project, not started yet.
+  piece of the project, and it hasn't been started yet.
 
 ## Running it
 
 Requires Java 21.
 
 ```bash
-./gradlew run       # runs dev.mohanverse.Main — blocks the week, runs the solver, prints results
+./gradlew run        # runs dev.mohanverse.Main: blocks the week, runs the solver, prints results
 ./gradlew build      # compile + test
 ```
 
@@ -131,19 +129,17 @@ Java 21 · Gradle · [Timefold Solver](https://timefold.ai) 2.2.0 · Lombok · L
 
 ## On the use of AI
 
-I built this with Claude Code as a pair-programming partner, and want to be upfront about how the
-work split.
+I built this with Claude Code as a pair-programming partner, and I want to be upfront about how the
+work actually split.
 
-Mine: the problem framing, the deterministic-vs-solver architectural split, deciding which
-constraints should be hard vs. soft, working through the real-world constraints (Garden's actual
-allotment opening hours, why Dominos shifts rule out a college day, how sleep should adapt to a
-late shift), and catching design gaps as they showed up — e.g. an early solver run silently
-clustered several `Cooking` tasks onto the same day because nothing in the model actually pinned a
-task to its intended date, which is what led to the `taskOnCorrectDate` constraint. Every design
-decision in this README was made through discussion before code was written, and reflects choices I
-made, not ones handed to me.
+The problem framing, the deterministic-vs-solver architectural split, deciding which constraints
+should be hard vs. soft, and working through the real-world constraints (Garden's actual allotment
+hours, why a Dominos shift rules out a college day, how sleep should adapt to a late shift) were
+mine. So was catching the design gaps as they came up. An early solver run, for instance, silently
+clustered several `Cooking` tasks onto the same day, because nothing in the model actually pinned a
+task to its intended date. That's what led to the `taskOnCorrectDate` constraint. Every design
+decision here came out of discussion before any code got written.
 
-Claude Code's role was implementation: writing the code once a design was agreed, pulling in
-Timefold's own documentation to keep the solver-specific code idiomatic, and running the project to
-verify behavior. I treated it the way I'd treat a capable pairing partner — useful for turning a
-decision into working code quickly, not for making the decisions.
+Claude Code wrote the code once a design was agreed on, pulled in Timefold's own documentation to
+keep the solver-specific parts idiomatic, and ran the project to check behavior. It did the typing.
+The decisions were mine.
