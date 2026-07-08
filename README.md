@@ -1,19 +1,22 @@
 # Personal Weekly Optimizer
 
-My week doesn't have a normal shape. Part-time shifts at Dominos cover costs while I finish an MSc
-in Secure Software Engineering at DCU and job-hunt on the side. Shift timing changes week to week,
-sleep depends on when the last shift ended, and everything else (study, garden, workout, cooking)
-has to fit around whatever's left. Most calendar tools assume a fixed 9-to-5 life. Mine doesn't have
-one, and manual planning had genuinely broken down. "Everything, nothing is getting planned."
+People never skip the deterministic parts of their week. The shift starts, so you're there. The
+class starts, so you're there. Nobody says "I didn't have time" about a fixed commitment, because
+the time was never optional in the first place. But the flexible parts — the workout, the garden,
+the thing you actually wanted to do — get dropped constantly, and "no time" is almost always the
+excuse. It's rarely true. The time exists. It just was never actually planned for, so whatever's
+fixed leaks into it by default.
 
-That's the problem that started this project. I also have an interview opportunity with Timefold,
-the company behind the open source constraint solver this planner runs on, for their Optimization
-Model Engineer role. I built this project to prepare for it: something real I could show, on their
-own solver, instead of usual process.
+My own week makes this obvious. Part-time shift work to cover living costs, an MSc in
+Secure Software Engineering at DCU, a job search running alongside both — the deterministic load is
+heavy, and it changes shape every week. Garden, workout, cooking, family time kept losing by
+default, not by choice, and manual planning had genuinely broken down: everything, and nothing, was
+getting planned.
 
-This isn't a scheduling app. The goal was to model my week honestly and see where real optimization
-is actually needed, versus where it's just structure nobody had written down. That question turned
-out to matter more than I expected, and the rest of this README is basically the answer.
+So this isn't a scheduling app. It's what happens when you stop treating "no time" as an answer and
+instead compute, precisely, how much time is actually left once every fixed commitment is accounted
+for — then treat placing the flexible stuff into that remainder as a real problem worth solving
+properly, not an afterthought.
 
 ## The core insight
 
