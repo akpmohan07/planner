@@ -5,7 +5,8 @@ Requires Java 21.
 ```bash
 ./gradlew run        # runs dev.mohanverse.Main: blocks the week, runs the solver, prints results
 ```
-
+[Fixed] - Deterministic Tasks
+[Solver] - Solver did solving.
 <img width="347" height="824" alt="image" src="https://github.com/user-attachments/assets/b8805e80-6b96-4044-82d8-a5c6e80aaa81" />
 
 # Personal Weekly Optimizer
