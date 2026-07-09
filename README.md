@@ -7,7 +7,8 @@ Requires Java 21.
 ```
 [Fixed] - Deterministic Tasks
 [Solver] - Solver did solving.
-<img width="347" height="824" alt="image" src="https://github.com/user-attachments/assets/b8805e80-6b96-4044-82d8-a5c6e80aaa81" />
+<img width="448" height="915" alt="image" src="https://github.com/user-attachments/assets/fa8fbed0-49c9-4259-a746-51bd756a6a01" />
+
 
 # Personal Weekly Optimizer
 
