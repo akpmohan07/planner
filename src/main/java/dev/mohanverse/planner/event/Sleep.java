@@ -1,7 +1,7 @@
 package dev.mohanverse.planner.event;
 
-import dev.mohanverse.planner.blocker.FixedEventBlocker;
 import dev.mohanverse.planner.domain.TimeGrain;
+import dev.mohanverse.planner.domain.Week;
 import lombok.Data;
 import lombok.AllArgsConstructor;
 import java.time.LocalDate;
@@ -15,13 +15,14 @@ import java.util.List;
 public class Sleep implements FixedEvent {
     private LocalDateTime start;
     private LocalDateTime end;
+    private Week week;
 
     @Override
     public String getLabel() { return "Sleep"; }
 
     @Override
     public List<FixedEvent> chainSubsequent() {
-        Wakeup wakeup = new Wakeup(end, end.plusHours(2));
+        Wakeup wakeup = new Wakeup(end, end.plusHours(2), week);
         return List.of(wakeup);
     }
 
@@ -31,13 +32,13 @@ public class Sleep implements FixedEvent {
      * 11PM (a late night), sleep is pushed to start right after that instead.
      * Sleep always lasts 8 hours from whenever it actually starts.
      */
-    public static Sleep forNight(LocalDate night, List<TimeGrain> grains) {
+    public static Sleep forNight(LocalDate night, Week week) {
         LocalDateTime defaultStart = LocalDateTime.of(night, LocalTime.of(23, 0));
         LocalDateTime windowEnd = defaultStart.plusHours(8);
 
         // look for the latest non-sleep blocked grain (Dominos/Travel) within
         // the default sleep window, that becomes the real sleep start time
-        LocalDateTime actualStart = grains.stream()
+        LocalDateTime actualStart = week.getGrains().stream()
                 .filter(TimeGrain::isBlocked)
                 .filter(g -> !"Sleep".equals(g.getOccupiedBy()))
                 .map(g -> LocalDateTime.of(g.getDate(), g.getStartTime()).plusMinutes(30))
@@ -45,7 +46,7 @@ public class Sleep implements FixedEvent {
                 .max(LocalDateTime::compareTo)
                 .orElse(defaultStart);
 
-        return new Sleep(actualStart, actualStart.plusHours(8));
+        return new Sleep(actualStart, actualStart.plusHours(8), week);
     }
 
     /**
@@ -53,7 +54,7 @@ public class Sleep implements FixedEvent {
      * whether a shift happened that night. This guarantees a minimum sleep
      * window daily, not just after shifts.
      */
-    public static void blockWeek(int year, int weekNumber, List<TimeGrain> grains) {
+    public static void blockWeek(int year, int weekNumber, Week week) {
         WeekFields weekFields = WeekFields.ISO;
         LocalDate monday = LocalDate.of(year, 1, 1)
                 .with(weekFields.weekOfYear(), weekNumber)
@@ -62,8 +63,8 @@ public class Sleep implements FixedEvent {
         // cover the tail end of the previous night too, so Monday morning is protected
         for (int day = -1; day < 7; day++) {
             LocalDate night = monday.plusDays(day);
-            Sleep sleep = forNight(night, grains);
-            FixedEventBlocker.block(grains, sleep);
+            Sleep sleep = forNight(night, week);
+            week.block(sleep);
         }
     }
 }

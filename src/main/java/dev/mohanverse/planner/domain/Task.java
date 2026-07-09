@@ -8,7 +8,6 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Getter
 @Setter
@@ -28,7 +27,9 @@ public class Task {
     @PlanningVariable
     private TimeGrain startingTimeGrain;
 
-    private static List<TimeGrain> allGrainsRef; // set once in Main before solving
+    private boolean requiresShiftAdjacentDay; // hard constraint: date must have or follow a shift
+
+    private static Week weekRef; // set once in Main before solving
 
 
     public Task(String name, int durationInGrains) {
@@ -50,17 +51,16 @@ public class Task {
     }
 
 
-    public static void setAllGrains(List<TimeGrain> grains) {
-        allGrainsRef = grains;
+    public static void setWeek(Week week) {
+        weekRef = week;
+    }
+
+    public static Week getWeek() {
+        return weekRef;
     }
 
     public int getSpilloverCount() {
         if (startingTimeGrain == null) return 0;
-        int start = startingTimeGrain.getIndex();
-        int count = 0;
-        for (int i = start; i < start + durationInGrains; i++) {
-            if (i >= allGrainsRef.size() || allGrainsRef.get(i).isBlocked()) count++;
-        }
-        return count;
+        return weekRef.spilloverCount(startingTimeGrain, durationInGrains);
     }
 }

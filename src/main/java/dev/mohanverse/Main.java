@@ -3,9 +3,9 @@ package dev.mohanverse;
 import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.config.solver.SolverConfig;
-import dev.mohanverse.planner.blocker.FixedEventBlocker;
 import dev.mohanverse.planner.domain.Task;
 import dev.mohanverse.planner.domain.TimeGrain;
+import dev.mohanverse.planner.domain.Week;
 import dev.mohanverse.planner.domain.WeekSchedule;
 import dev.mohanverse.planner.event.Shift;
 import dev.mohanverse.planner.event.Sleep;
@@ -33,24 +33,12 @@ public class Main {
         Shift sunday = new Shift(
                 LocalDateTime.of(2026, 7, 12, 19, 0),
                 LocalDateTime.of(2026, 7, 13, 2, 0));
+        List<Shift> shifts = List.of(friday, saturday, sunday);
 
-        FixedEventBlocker.block(allGrains, friday);
-        FixedEventBlocker.block(allGrains, saturday);
-        FixedEventBlocker.block(allGrains, sunday);
+        Week week = new Week(allGrains, shifts);
+        shifts.forEach(week::block);
+        Sleep.blockWeek(2026, 28, week);
 
-        Sleep.blockWeek(2026, 28, allGrains);
-
-        // print
-        allGrains.stream()
-                .filter(TimeGrain::isBlocked)
-                .forEach(g -> System.out.println(g.getDate() + " " + g.getStartTime() + " is blocked by " + g.getOccupiedBy()));
-
-
-
-        CalendarPrinter.print(allGrains);
-        List<TimeGrain> freeGrains = allGrains.stream()
-                .filter(g -> !g.isBlocked())
-                .toList();
         List<Task> tasks = new ArrayList<>();
         WeekFields weekFields = WeekFields.ISO;
         LocalDate monday = LocalDate.of(2026, 1, 1)
@@ -61,7 +49,19 @@ public class Main {
             tasks.add(new Task("Cooking-" + day, 2, 19, date)); // 1h, prefer 7PM
         }
 
-        Task.setAllGrains(allGrains);
+        // Shift days don't get a fixed Study block (see Wakeup) — study there is a
+        // flexible Task instead, competing for whatever time is left before the shift.
+        for (Shift shift : shifts) {
+            LocalDate shiftDate = shift.getStart().toLocalDate();
+            tasks.add(new Task("Study-" + shiftDate, 4, 15)); // 2h goal, prefer 3PM
+        }
+
+        // Entertainment can only land on a day that has a shift itself, or the day after one.
+        Task entertainment = new Task("Entertainment", 6, 20); // 3h, prefer 8PM
+        entertainment.setRequiresShiftAdjacentDay(true);
+        tasks.add(entertainment);
+
+        Task.setWeek(week);
 
         SolverFactory<WeekSchedule> factory = SolverFactory.create(
                 new SolverConfig()
@@ -72,15 +72,11 @@ public class Main {
         );
 
         Solver<WeekSchedule> solver = factory.buildSolver();
-        WeekSchedule solution = solver.solve(new WeekSchedule(freeGrains, tasks));
+        WeekSchedule solution = solver.solve(new WeekSchedule(week.freeGrains(), tasks));
+
+        CalendarPrinter.print(allGrains, solution.getTasks());
 
         System.out.println();
-        System.out.println("=== Solved Tasks ===");
-        solution.getTasks().forEach(t -> {
-            var grain = t.getStartingTimeGrain();
-            System.out.println(t.getName() + " (" + t.getDurationInGrains() + " grains) -> "
-                    + grain.getDate() + " " + grain.getStartTime());
-        });
         System.out.println("Score: " + solution.getScore());
     }
 }

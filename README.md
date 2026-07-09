@@ -36,18 +36,19 @@ dev.mohanverse.planner
 ├── domain
 │   ├── TimeGrain.java       — one 30-min cell in the week (index, date, startTime, blocked, occupiedBy)
 │   ├── Task.java            — @PlanningEntity, flexible activities the solver places
+│   ├── Week.java            — owns the grains + shift list, answers hasShiftOn/nextShiftStartAfter/spillover
 │   └── WeekSchedule.java    — @PlanningSolution
 ├── event
 │   ├── FixedEvent.java      — interface: getStart/getEnd/getLabel/chainSubsequent()
 │   ├── Shift.java           — work shift, chains into Travel
-│   ├── Wakeup.java          — decides Travel + StudyTime chain
+│   ├── Wakeup.java          — shift-aware: pre-shift block on shift days, Travel + StudyTime otherwise
 │   ├── Travel.java          — generic reusable block, no chaining logic of its own
 │   ├── Sleep.java           — Sleep.forNight() adapts to shift end time; Sleep.blockWeek() applies daily
-│   └── StudyTime.java       — plain block, deterministic study window
+│   └── StudyTime.java       — plain block, deterministic study window (non-shift days only)
 ├── blocker
 │   └── FixedEventBlocker.java — recursively blocks grains for an event + its chainSubsequent()
 ├── solver
-│   └── PlannerConstraintProvider.java — overlap, spillover, date, and preference constraints
+│   └── PlannerConstraintProvider.java — overlap, spillover, date, shift-adjacency, and preference constraints
 └── util
     ├── TimeGrainGenerator.java — generateWeek(year, weekNumber) → 336 grains (30-min × 48 × 7)
     └── CalendarPrinter.java    — pretty-prints the week with per-block hours and weekly totals
@@ -57,21 +58,30 @@ dev.mohanverse.planner
 
 `FixedEvent` is a pure contract: start, end, label, `chainSubsequent()`. Originating events
 (`Shift`, `Wakeup`) own real-world context and decide what happens next. Building blocks (`Travel`,
-`Sleep`, `StudyTime`). These are all deterministic events where it have one perfect solution, which I know.
+`Sleep`, `StudyTime`) are dumb — they don't invent their own follow-up, they just carry whatever
+they're given.
 
+`Wakeup` is the interesting one: it looks ahead at `Week` to check whether a shift starts later
+that same day, not just at the calendar day of week. On an ordinary day, the answer really is fixed
+— library on weekdays, home on weekends, no real choice either way. On a shift day, forcing a fixed
+7-hour study block would just run the day straight into work with no room for anything else. So
+instead of guessing a shorter fixed number, `Wakeup` reserves only what's genuinely non-negotiable —
+a 1-hour get-ready-and-commute block ending exactly at shift start — and leaves the rest as ordinary
+free time for the solver to fill:
 
 ```java
-// Wakeup.chainSubsequent(): a weekday gets Travel + StudyTime,dy
-if (isWeekday) {
-    return List.of(travel, new StudyTime(travelEnd, travelEnd.plusHours(7)));
+Optional<LocalDateTime> shiftStart = week.nextShiftStartAfter(end);
+if (shiftStart.isPresent()) {
+    // Shift later today: reserve the commute, leave the rest genuinely free
+    Travel preShiftTravel = new Travel(shiftStart.get().minusHours(1), shiftStart.get());
+    return List.of(preShiftTravel);
 }
-//  Weekend gets just Study, where I college is closed.
-return List.of(study);
+// No shift today: Study is still fixed — library on weekdays, home on weekends
 ```
 
 `FixedEventBlocker.block(grains, event)` blocks an event's own range, then recurses into
 `event.chainSubsequent()`. A three-line `Shift` object in `Main` cascades into Travel, Sleep,
-Wakeup, Travel and StudyTime automatically. None of that chain is hand-wired in `Main`.
+Wakeup, and whatever Wakeup decides, automatically. None of that chain is hand-wired in `Main`.
 
 ## The actual solver problem
 
@@ -87,33 +97,32 @@ Constraints currently implemented in `PlannerConstraintProvider`:
 | `noOverlappingTasks` | hard | pairwise grain-index overlap between any two tasks |
 | `noSpilloverIntoBlocked` | hard | a task's full duration doesn't run into an already-blocked grain |
 | `taskOnCorrectDate` | hard | a task pinned to a specific calendar date actually lands there |
+| `shiftAdjacentDayRequired` | hard | a task's date has a shift itself, or the day before it does |
 | `preferPreferredStartHour` | soft | penalizes `\|actualHour - preferredHour\|` |
 
 ### What's working end to end today
 
-Cooking is the first task fully wired through the solver. Seven one-hour sessions, one per day,
-each hard-pinned to its calendar date and softly preferring 7pm. There's no day-of-week logic
-anywhere. The solver just looks at whatever's actually free that week and finds the closest
-available hour to 19:00 for each day, sliding earlier automatically on days a shift already occupies
-dinner time:
+Four task types compete for the same free time: seven `Cooking` sessions pinned one-per-day, a
+`Study` task on each shift day (filling whatever's left before work, now that `Wakeup` no longer
+hardcodes a fixed study block there), and one `Entertainment` task restricted to a day that has a
+shift or follows one. On Friday — a shift day — the solver works out a full, sensible afternoon on
+its own, with nothing hand-placed:
 
 ```
-Cooking-0 (Mon) -> 19:00   Cooking-1 (Tue) -> 19:00   Cooking-2 (Wed) -> 19:00
-Cooking-3 (Thu) -> 19:00   Cooking-4 (Fri) -> 18:00*  Cooking-5 (Sat) -> 18:00*
-Cooking-6 (Sun) -> 18:00*                              (* shift starts at/after 19:00)
-Score: 0hard/-3soft
+Wakeup ends 09:00 → free → Entertainment 12:00–15:00 → Study 15:00–17:00 →
+Cooking-4 17:00–18:00 → pre-shift Travel 18:00–19:00 → Dominos shift 19:00
+Score: 0hard/-14soft
 ```
 
-`0hard` means every task landed on its correct day with no overlaps or spillover. The `-3soft` is
-the true optimum here. There's no arrangement that gets any of the three shift-day cooking sessions
-to exactly 7pm without spilling into the shift. If the shift schedule changes next week, this keeps
-working with zero code changes, because nothing is hardcoded to specific days.
+`0hard` means every task landed on a valid day with no overlaps or spillover, including the shift-
+adjacency rule for `Entertainment`. The remaining soft penalty is just the usual tension between
+tasks' preferred hours. None of this is hardcoded to Friday specifically — the shift-adjacency check
+and the pre-shift reservation are both computed off `Week`'s actual blocked grains, so this keeps
+working unchanged if the shift schedule moves to different days next week.
 
 ## Roadmap
 
-- Generalize `Wakeup`'s Travel/StudyTime decision to react to whatever's actually blocked that day
-  (e.g. a shift), instead of a fixed weekday/weekend calendar check.
-- Wire Garden and Workout into the solver alongside Cooking.
+- Wire Garden and Workout into the solver alongside Cooking, Study, and Entertainment.
 - **A priority-based "call family" slot:** hard constraint for closest family, round-robin soft
   constraint for everyone else, driven by last-contacted date. The most genuinely solver-shaped
   piece of the project, and it hasn't been started yet.
