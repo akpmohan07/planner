@@ -101,6 +101,8 @@ Constraints currently implemented in `PlannerConstraintProvider`:
 | `preferPreferredStartHour` | soft | penalizes `\|actualHour - preferredHour\|` |
 
 ### What's working end to end today
+<img width="347" height="824" alt="image" src="https://github.com/user-attachments/assets/b8805e80-6b96-4044-82d8-a5c6e80aaa81" />
+
 
 Four task types compete for the same free time: seven `Cooking` sessions pinned one-per-day, a
 `Study` task on each shift day (filling whatever's left before work, now that `Wakeup` no longer
