@@ -1,3 +1,11 @@
+## Running it
+
+Requires Java 21.
+
+```bash
+./gradlew run        # runs dev.mohanverse.Main: blocks the week, runs the solver, prints results
+```
+
 # Personal Weekly Optimizer
 
 People never skip the deterministic parts of their week. The shift starts, so you're there. The
@@ -129,14 +137,7 @@ working unchanged if the shift schedule moves to different days next week.
   constraint for everyone else, driven by last-contacted date. The most genuinely solver-shaped
   piece of the project, and it hasn't been started yet.
 
-## Running it
 
-Requires Java 21.
-
-```bash
-./gradlew run        # runs dev.mohanverse.Main: blocks the week, runs the solver, prints results
-./gradlew build      # compile + test
-```
 
 ## Stack
 
